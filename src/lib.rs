@@ -15,7 +15,7 @@ pub enum Value {
 
 impl Board {
     pub fn row(&self, pos: Value) -> &[Cell; 9] {
-        self.board.get(pos as usize).expect("Index in 1..=9")
+        self.board.get(pos as usize - 1).expect("Index in 0..9")
     }
 
     pub fn col(&self, pos: Value) -> impl Iterator<Item = &Cell> {
@@ -241,6 +241,69 @@ mod tests {
         assert_eq!(output.lines().count(), 9);
         // Check first line
         assert_eq!(output.lines().next().unwrap(), "5 3 . . 7 . . . . ");
+    }
+
+    #[test]
+    fn test_board_row() {
+        let input = "5 3 . . 7 . . . .\n\
+                     6 . . 1 9 5 . . .\n\
+                     . 9 8 . . . . 6 .\n\
+                     8 . . . 6 . . . 3\n\
+                     4 . . 8 . 3 . . 1\n\
+                     7 . . . 2 . . . 6\n\
+                     . 6 . . . . 2 8 .\n\
+                     . . . 4 1 9 . . 5\n\
+                     . . . . 8 . . 7 9";
+        let board = Board::try_from(input).unwrap();
+
+        // Test row 1: should be [5,3,.,.,7,.,.,.,.]
+        let row1 = board.row(Value::One);
+        assert_eq!(row1.len(), 9);
+        assert!(matches!(row1[0], Cell::Filled(Value::Five)));
+        assert!(matches!(row1[1], Cell::Filled(Value::Three)));
+        assert!(matches!(row1[2], Cell::Empty));
+        assert!(matches!(row1[4], Cell::Filled(Value::Seven)));
+
+        // Test row 2: should be [6,.,.,1,9,5,.,.,.]
+        let row2 = board.row(Value::Two);
+        assert_eq!(row2.len(), 9);
+        assert!(matches!(row2[0], Cell::Filled(Value::Six)));
+        assert!(matches!(row2[1], Cell::Empty));
+        assert!(matches!(row2[3], Cell::Filled(Value::One)));
+        assert!(matches!(row2[4], Cell::Filled(Value::Nine)));
+        assert!(matches!(row2[5], Cell::Filled(Value::Five)));
+    }
+
+    #[test]
+    fn test_board_col() {
+        let input = "5 3 . . 7 . . . .\n\
+                     6 . . 1 9 5 . . .\n\
+                     . 9 8 . . . . 6 .\n\
+                     8 . . . 6 . . . 3\n\
+                     4 . . 8 . 3 . . 1\n\
+                     7 . . . 2 . . . 6\n\
+                     . 6 . . . . 2 8 .\n\
+                     . . . 4 1 9 . . 5\n\
+                     . . . . 8 . . 7 9";
+        let board = Board::try_from(input).unwrap();
+
+        // Test col 1: should be [5,6,.,8,4,7,.,.,.]
+        let col1: Vec<_> = board.col(Value::One).collect();
+        assert_eq!(col1.len(), 9);
+        assert!(matches!(col1[0], Cell::Filled(Value::Five)));
+        assert!(matches!(col1[1], Cell::Filled(Value::Six)));
+        assert!(matches!(col1[2], Cell::Empty));
+        assert!(matches!(col1[3], Cell::Filled(Value::Eight)));
+        assert!(matches!(col1[4], Cell::Filled(Value::Four)));
+
+        // Test col 5: should be [7,9,.,6,.,2,.,1,8]
+        let col5: Vec<_> = board.col(Value::Five).collect();
+        assert_eq!(col5.len(), 9);
+        assert!(matches!(col5[0], Cell::Filled(Value::Seven)));
+        assert!(matches!(col5[1], Cell::Filled(Value::Nine)));
+        assert!(matches!(col5[2], Cell::Empty));
+        assert!(matches!(col5[3], Cell::Filled(Value::Six)));
+        assert!(matches!(col5[8], Cell::Filled(Value::Eight)));
     }
 
     #[test]
