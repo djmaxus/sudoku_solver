@@ -132,5 +132,86 @@ mod sudoku {
             assert!(Value::try_from(10).is_err());
             assert!(Value::try_from(255).is_err());
         }
+
+        #[test]
+        fn test_cell_try_from_empty() {
+            let cell = Cell::try_from('.').unwrap();
+            assert!(matches!(cell, Cell::Empty));
+        }
+
+        #[test]
+        fn test_cell_try_from_filled_digits() {
+            assert!(matches!(Cell::try_from('1').unwrap(), Cell::Filled(Value::One)));
+            assert!(matches!(Cell::try_from('5').unwrap(), Cell::Filled(Value::Five)));
+            assert!(matches!(Cell::try_from('9').unwrap(), Cell::Filled(Value::Nine)));
+        }
+
+        #[test]
+        fn test_cell_try_from_invalid_char() {
+            assert!(Cell::try_from('a').is_err());
+            assert!(Cell::try_from('!').is_err());
+            assert!(Cell::try_from('0').is_err());
+        }
+
+        #[test]
+        fn test_board_try_from_valid() {
+            let input = "5 3 . . 7 . . . .\n\
+                         6 . . 1 9 5 . . .\n\
+                         . 9 8 . . . . 6 .\n\
+                         8 . . . 6 . . . 3\n\
+                         4 . . 8 . 3 . . 1\n\
+                         7 . . . 2 . . . 6\n\
+                         . 6 . . . . 2 8 .\n\
+                         . . . 4 1 9 . . 5\n\
+                         . . . . 8 . . 7 9";
+            let board = Board::try_from(input);
+            assert!(board.is_ok());
+        }
+
+        #[test]
+        fn test_board_try_from_invalid_too_few_rows() {
+            let input = "5 3 . . 7 . . . .\n\
+                         6 . . 1 9 5 . . .";
+            let board = Board::try_from(input);
+            assert!(board.is_err());
+        }
+
+        #[test]
+        fn test_board_try_from_invalid_too_few_cols() {
+            let input = "5 3 . . 7\n\
+                         6 . . 1 9\n\
+                         . 9 8 . .\n\
+                         8 . . . 6\n\
+                         4 . . 8 .\n\
+                         7 . . . 2\n\
+                         . 6 . . .\n\
+                         . . . 4 1\n\
+                         . . . . 8";
+            let board = Board::try_from(input);
+            assert!(board.is_err());
+        }
+
+        #[test]
+        fn test_board_to_string() {
+            let input = "5 3 . . 7 . . . .\n\
+                         6 . . 1 9 5 . . .\n\
+                         . 9 8 . . . . 6 .\n\
+                         8 . . . 6 . . . 3\n\
+                         4 . . 8 . 3 . . 1\n\
+                         7 . . . 2 . . . 6\n\
+                         . 6 . . . . 2 8 .\n\
+                         . . . 4 1 9 . . 5\n\
+                         . . . . 8 . . 7 9";
+            let board = Board::try_from(input).unwrap();
+            let output = board.to_string();
+            
+            // Check that output contains expected patterns
+            assert!(output.contains("5 3 ."));
+            assert!(output.contains("6 . ."));
+            // Check we have 9 lines
+            assert_eq!(output.lines().count(), 9);
+            // Check first line
+            assert_eq!(output.lines().next().unwrap(), "5 3 . . 7 . . . . ");
+        }
     }
 }
