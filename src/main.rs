@@ -5,7 +5,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-mod sudoku {
+pub mod sudoku {
 
     use anyhow::anyhow;
 
@@ -20,6 +20,35 @@ mod sudoku {
         Seven,
         Eight,
         Nine,
+    }
+
+    impl Board {
+        pub fn row(&self, pos: Value) -> &[Cell; 9] {
+            self.board.get(pos as usize).expect("Index in 1..=9")
+        }
+
+        pub fn col(&self, pos: Value) -> impl Iterator<Item = &Cell> {
+            self.board
+                .iter()
+                .flatten()
+                .skip(pos as usize - 1)
+                .step_by(9)
+        }
+
+        /// 3x3 block indexed in row-major order, output is also in row-major order
+        pub fn block(&self, pos: Value) -> impl Iterator<Item = &Cell> {
+            let block_idx = pos as usize - 1;
+            let block_row = block_idx / 3;
+            let block_col = block_idx % 3;
+            let start_row = block_row * 3;
+            let start_col = block_col * 3;
+
+            self.board
+                .iter()
+                .skip(start_row)
+                .take(3)
+                .flat_map(move |row| row.iter().skip(start_col).take(3))
+        }
     }
 
     impl TryFrom<u8> for Value {
@@ -221,6 +250,36 @@ mod sudoku {
             assert_eq!(output.lines().count(), 9);
             // Check first line
             assert_eq!(output.lines().next().unwrap(), "5 3 . . 7 . . . . ");
+        }
+
+        #[test]
+        fn test_board_block() {
+            let input = "5 3 . . 7 . . . .\n\
+                         6 . . 1 9 5 . . .\n\
+                         . 9 8 . . . . 6 .\n\
+                         8 . . . 6 . . . 3\n\
+                         4 . . 8 . 3 . . 1\n\
+                         7 . . . 2 . . . 6\n\
+                         . 6 . . . . 2 8 .\n\
+                         . . . 4 1 9 . . 5\n\
+                         . . . . 8 . . 7 9";
+            let board = Board::try_from(input).unwrap();
+
+            // Test block 1 (top-left): should be [5,3,.,6,..,.,9,8]
+            let block1: Vec<_> = board.block(Value::One).collect();
+            assert_eq!(block1.len(), 9);
+            assert!(matches!(block1[0], Cell::Filled(Value::Five)));
+            assert!(matches!(block1[1], Cell::Filled(Value::Three)));
+            assert!(matches!(block1[2], Cell::Empty));
+            assert!(matches!(block1[3], Cell::Filled(Value::Six)));
+
+            // Test block 5 (center): should be [.,6,.,8,.,3,.,2,.]
+            let block5: Vec<_> = board.block(Value::Five).collect();
+            assert_eq!(block5.len(), 9);
+            assert!(matches!(block5[0], Cell::Empty));
+            assert!(matches!(block5[1], Cell::Filled(Value::Six)));
+            assert!(matches!(block5[3], Cell::Filled(Value::Eight)));
+            assert!(matches!(block5[5], Cell::Filled(Value::Three)));
         }
     }
 }
