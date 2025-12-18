@@ -1,6 +1,19 @@
 use anyhow::anyhow;
+use std::collections::HashSet;
 
-#[derive(Debug, Clone, Copy)]
+impl Board {
+    pub fn solve(&self) -> Result<Self, Self> {
+        let mut solved = self.clone();
+        // 0. validate that the initial board is correct
+        // 1. identify candidates for each empty cell
+        // 2. Put values where there's only one candidate
+        // 3. repeat 1-2 until no change is being made
+        // 4. output fully solved as Ok or partially solved as Err
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Value {
     One = 1,
     Two,
@@ -11,6 +24,49 @@ pub enum Value {
     Seven,
     Eight,
     Nine,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValueSet {
+    values: HashSet<Value>,
+}
+
+impl<'a, IterCell: Iterator<Item = &'a Cell>> From<IterCell> for ValueSet {
+    fn from(value: IterCell) -> Self {
+        ValueSet::from_cells(value)
+    }
+}
+
+impl ValueSet {
+    pub fn from_cells<'a>(cells: impl Iterator<Item = &'a Cell>) -> Self {
+        let mut present = HashSet::new();
+        for cell in cells {
+            if let Cell::Filled(value) = cell {
+                present.insert(*value);
+            }
+        }
+
+        let all_values = [
+            Value::One,
+            Value::Two,
+            Value::Three,
+            Value::Four,
+            Value::Five,
+            Value::Six,
+            Value::Seven,
+            Value::Eight,
+            Value::Nine,
+        ];
+
+        let mut values = HashSet::new();
+        for value in all_values {
+            if !present.contains(&value) {
+                values.insert(value);
+            }
+        }
+
+        Self { values }
+    }
 }
 
 impl Board {
@@ -77,13 +133,13 @@ impl TryFrom<char> for Cell {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Cell {
     Empty,
     Filled(Value),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Board {
     board: [[Cell; 9]; 9],
 }
@@ -99,8 +155,7 @@ impl TryFrom<&str> for Board {
                 .filter(|ch| ch != &' ')
                 .flat_map(|ch| Cell::try_from(ch))
                 .collect();
-            let row: [Cell; 9] =
-                <[Cell; 9]>::try_from(row).map_err(|err| anyhow!("{err:?}"))?;
+            let row: [Cell; 9] = <[Cell; 9]>::try_from(row).map_err(|err| anyhow!("{err:?}"))?;
             rows.push(row);
         }
         let board: [[Cell; 9]; 9] = rows.try_into().map_err(|err| anyhow!("{err:?}"))?;
