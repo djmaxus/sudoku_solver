@@ -141,9 +141,18 @@ mod sudoku {
 
         #[test]
         fn test_cell_try_from_filled_digits() {
-            assert!(matches!(Cell::try_from('1').unwrap(), Cell::Filled(Value::One)));
-            assert!(matches!(Cell::try_from('5').unwrap(), Cell::Filled(Value::Five)));
-            assert!(matches!(Cell::try_from('9').unwrap(), Cell::Filled(Value::Nine)));
+            assert!(matches!(
+                Cell::try_from('1').unwrap(),
+                Cell::Filled(Value::One)
+            ));
+            assert!(matches!(
+                Cell::try_from('5').unwrap(),
+                Cell::Filled(Value::Five)
+            ));
+            assert!(matches!(
+                Cell::try_from('9').unwrap(),
+                Cell::Filled(Value::Nine)
+            ));
         }
 
         #[test]
@@ -204,7 +213,7 @@ mod sudoku {
                          . . . . 8 . . 7 9";
             let board = Board::try_from(input).unwrap();
             let output = board.to_string();
-            
+
             // Check that output contains expected patterns
             assert!(output.contains("5 3 ."));
             assert!(output.contains("6 . ."));
