@@ -56,14 +56,17 @@ end
 sudoku_system = [constraints;known_vals];
 A = sudoku_system(:,1:end-1);
 b = sudoku_system(:,end);
-x = ones(numel(board),1)*5;
+x = zeros(numel(board),1)*9;
 r = b - A*x;
-while norm(r) > eps
+i = 0;
+while norm(r) > eps && i < 2
     dx = A \ r;
     x = x + dx;
-    x = max(x,1);
-    x = min(x,9);
+    % x = max(x,1);
+    % x = min(x,9);
     r = b - A*x;
     disp(norm(r));
+    i = i + 1;
 end
-
+solved = reshape(x,9,9);
+uint8(solved)
