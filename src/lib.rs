@@ -2,11 +2,13 @@ use anyhow::anyhow;
 use std::{collections::HashSet, fmt::Display};
 
 impl Board {
-    pub fn solve(&self) -> Result<Self, SolveError> {
+    pub fn solve(&self, show_progress: bool) -> Result<Self, SolveError> {
         let mut solved = self.clone().is_valid()?;
         while !solved.is_solved() {
             solved = solved.fill_candidates()?;
-            println!("{solved}");
+            if show_progress {
+                println!("{solved}");
+            }
         }
         Ok(solved)
         // 0. validate that the initial board is correct
