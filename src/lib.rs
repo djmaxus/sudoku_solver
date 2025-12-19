@@ -1,19 +1,121 @@
 use anyhow::anyhow;
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::Display};
 
 impl Board {
-    pub fn solve(&self) -> Result<Self, Self> {
-        let mut solved = self.clone();
+    pub fn solve(&self) -> Result<Self, SolveError> {
+        let mut solved = self.clone().is_valid()?;
+        while !solved.is_solved() {
+            solved = solved.fill_candidates()?;
+            println!("{solved}");
+        }
+        Ok(solved)
         // 0. validate that the initial board is correct
         // 1. identify candidates for each empty cell
         // 2. Put values where there's only one candidate
         // 3. repeat 1-2 until no change is being made
         // 4. output fully solved as Ok or partially solved as Err
-        todo!()
+    }
+    pub fn is_valid(self) -> Result<Self, SolveError> {
+        for pos in Value::iter() {
+            match ValueSet::from_present_in(self.row(pos).iter()) {
+                Some(_) => (),
+                None => return Err(SolveError::InvalidInitial(self)),
+            };
+            match ValueSet::from_present_in(self.col(pos)) {
+                Some(_) => (),
+                None => return Err(SolveError::InvalidInitial(self)),
+            };
+            match ValueSet::from_present_in(self.block(pos)) {
+                Some(_) => (),
+                None => return Err(SolveError::InvalidInitial(self)),
+            };
+        }
+        Ok(self)
+    }
+
+    fn is_solved(&self) -> bool {
+        self.board
+            .iter()
+            .flatten()
+            .all(|cell| matches!(cell, Cell::Solved(_) | Cell::Filled(_)))
+    }
+
+    fn from_cells(cells: [[Cell; 9]; 9]) -> Result<Self, SolveError> {
+        Self { board: cells }.is_valid()
+    }
+
+    fn fill_candidates(mut self) -> Result<Self, SolveError> {
+        // fill for rows
+        for row in Value::iter() {
+            let candidate_set = ValueSet::from_cells(self.row(row).iter());
+            self.row_mut(row).iter_mut().for_each(|cell| {
+                match cell {
+                    Cell::Empty => *cell = Cell::Candidates(candidate_set.clone()),
+                    Cell::Candidates(cell_cands) => {
+                        *cell = Cell::Candidates(cell_cands.intersect(&candidate_set))
+                    }
+                    _ => (),
+                };
+            });
+        }
+        // then narrow sets with cols
+        for col in Value::iter() {
+            let candidate_set = ValueSet::from_cells(self.col(col));
+            self.col_mut(col).for_each(|cell| {
+                match cell {
+                    Cell::Empty => *cell = Cell::Candidates(candidate_set.clone()),
+                    Cell::Candidates(cell_cands) => {
+                        *cell = Cell::Candidates(cell_cands.intersect(&candidate_set))
+                    }
+                    _ => (),
+                };
+            });
+        }
+        // and then with blocks
+
+        for block in Value::iter() {
+            let candidate_set = ValueSet::from_cells(self.block(block));
+            self.block_mut(block).for_each(|cell| {
+                match cell {
+                    Cell::Empty => *cell = Cell::Candidates(candidate_set.clone()),
+                    Cell::Candidates(cell_cands) => {
+                        *cell = Cell::Candidates(cell_cands.intersect(&candidate_set))
+                    }
+                    _ => (),
+                };
+            });
+        }
+        // iterate over the board and turn single candidates into solved one
+        let mut solved_count = 0;
+        for cell in self.board.iter_mut().flatten() {
+            *cell = match cell.clone() {
+                Cell::Candidates(value_set) if value_set.values.len() == 1 => {
+                    solved_count += 1;
+                    Cell::Solved(value_set.values.into_iter().next().unwrap())
+                }
+                non_cand_cell => non_cand_cell,
+            };
+        }
+        if solved_count == 0 {
+            return Err(SolveError::UnderSolved(self));
+        }
+        Ok(self)
     }
 }
+use derive_more::Display;
+#[derive(Error, Debug, Display)]
+pub enum SolveError {
+    /// Initial input is invalid
+    #[display("Invalid state of the board")]
+    InvalidInitial(Board),
+    /// Solver partially with uncertainties remainind
+    #[display("Multiple solutions possible")]
+    UnderSolved(Board),
+}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 pub enum Value {
     One = 1,
     Two,
@@ -38,10 +140,34 @@ impl<'a, IterCell: Iterator<Item = &'a Cell>> From<IterCell> for ValueSet {
 }
 
 impl ValueSet {
+    fn intersect(&self, other: &ValueSet) -> Self {
+        // the only possible values are in the intersection
+        let values = self.values.intersection(&other.values).cloned().collect();
+        Self { values }
+    }
+    // Returns None if there are duplicates
+    fn from_present_in<'a>(cells: impl Iterator<Item = &'a Cell>) -> Option<Self> {
+        let mut present = HashSet::new();
+        for cell in cells {
+            let value = match cell {
+                Cell::Empty => continue,
+                Cell::Filled(value) => value.clone(),
+                Cell::Candidates(_) => continue,
+                Cell::Solved(value) => value.clone(),
+            };
+
+            let inserted = present.insert(value);
+            if !inserted {
+                return None;
+            }
+        }
+        Some(ValueSet { values: present })
+    }
+
     pub fn from_cells<'a>(cells: impl Iterator<Item = &'a Cell>) -> Self {
         let mut present = HashSet::new();
         for cell in cells {
-            if let Cell::Filled(value) = cell {
+            if let Cell::Filled(value) | Cell::Solved(value) = cell {
                 present.insert(*value);
             }
         }
@@ -73,6 +199,9 @@ impl Board {
     pub fn row(&self, pos: Value) -> &[Cell; 9] {
         self.board.get(pos as usize - 1).expect("Index in 0..9")
     }
+    pub fn row_mut(&mut self, pos: Value) -> &mut [Cell; 9] {
+        self.board.get_mut(pos as usize - 1).expect("Index in 0..9")
+    }
 
     pub fn col(&self, pos: Value) -> impl Iterator<Item = &Cell> {
         self.board
@@ -80,6 +209,36 @@ impl Board {
             .flatten()
             .skip(pos as usize - 1)
             .step_by(9)
+    }
+
+    pub fn col_mut(&mut self, pos: Value) -> impl Iterator<Item = &mut Cell> {
+        self.board
+            .iter_mut()
+            .flatten()
+            .skip(pos as usize - 1)
+            .step_by(9)
+    }
+
+    fn block_mut(&mut self, pos: Value) -> impl Iterator<Item = &mut Cell> {
+        Board::block_from(self.board.iter_mut(), pos)
+    }
+
+    fn block_from<RowIter, CellItem>(
+        rows: impl Iterator<Item = RowIter>,
+        pos: Value,
+    ) -> impl Iterator<Item = CellItem>
+    where
+        RowIter: IntoIterator<Item = CellItem>,
+    {
+        let block_idx = pos as usize - 1;
+        let block_row = block_idx / 3;
+        let block_col = block_idx % 3;
+        let start_row = block_row * 3;
+        let start_col = block_col * 3;
+
+        rows.skip(start_row)
+            .take(3)
+            .flat_map(move |row| row.into_iter().skip(start_col).take(3))
     }
 
     /// 3x3 block indexed in row-major order, output is also in row-major order
@@ -137,9 +296,13 @@ impl TryFrom<char> for Cell {
 pub enum Cell {
     Empty,
     Filled(Value),
+    Candidates(ValueSet),
+    Solved(Value),
 }
 
-#[derive(Debug, Clone)]
+use derive_more::Error;
+
+#[derive(Debug, Clone, Error)]
 pub struct Board {
     board: [[Cell; 9]; 9],
 }
@@ -159,28 +322,32 @@ impl TryFrom<&str> for Board {
             rows.push(row);
         }
         let board: [[Cell; 9]; 9] = rows.try_into().map_err(|err| anyhow!("{err:?}"))?;
-        Ok(Self { board })
+        let board = Self::from_cells(board)?;
+        Ok(board)
     }
 }
 
-impl ToString for Board {
-    fn to_string(&self) -> String {
-        let mut result = String::new();
-        let board = &self.board;
-        for row in board.iter() {
-            for cell in row.iter() {
-                let ch = match cell {
-                    Cell::Empty => '.',
-                    Cell::Filled(value) => {
-                        char::from_digit(*value as u32, 10).expect("digit in 1..=9")
-                    }
-                };
-                result.push(ch);
-                result.push(' ');
+impl Display for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn to_string(board: &Board) -> String {
+            let mut result = String::new();
+            let board = &board.board;
+            for row in board.iter() {
+                for cell in row.iter() {
+                    let ch = match cell {
+                        Cell::Empty | Cell::Candidates(_) => '.',
+                        Cell::Filled(value) | Cell::Solved(value) => {
+                            char::from_digit(*value as u32, 10).expect("digit in 1..=9")
+                        }
+                    };
+                    result.push(ch);
+                    result.push(' ');
+                }
+                result.push('\n');
             }
-            result.push('\n');
+            result
         }
-        result
+        write!(f, "{}", to_string(self))
     }
 }
 
