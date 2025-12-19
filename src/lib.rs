@@ -307,10 +307,10 @@ pub struct Board {
     board: [[Cell; 9]; 9],
 }
 
-impl TryFrom<&str> for Board {
-    type Error = anyhow::Error;
+impl std::str::FromStr for Board {
+    type Err = anyhow::Error;
 
-    fn try_from(input: &str) -> anyhow::Result<Self> {
+    fn from_str(input: &str) -> anyhow::Result<Self> {
         let mut rows = Vec::with_capacity(9);
         for line in input.lines().take(9) {
             let row: Vec<Cell> = line
