@@ -3,7 +3,7 @@ use std::process::Command;
 #[test]
 fn test_main_runs_successfully() {
     let output = Command::new("cargo")
-        .args(&["run", "--quiet"])
+        .args(["run", "--quiet"])
         .output()
         .expect("Failed to execute cargo run");
 

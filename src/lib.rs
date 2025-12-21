@@ -21,15 +21,15 @@ impl Board {
         for pos in Value::iter() {
             match ValueSet::from_present_in(self.row(pos).iter()) {
                 Some(_) => (),
-                None => return Err(SolveError::InvalidInitial(self)),
+                None => return Err(SolveError::InvalidInitial),
             };
             match ValueSet::from_present_in(self.col(pos)) {
                 Some(_) => (),
-                None => return Err(SolveError::InvalidInitial(self)),
+                None => return Err(SolveError::InvalidInitial),
             };
             match ValueSet::from_present_in(self.block(pos)) {
                 Some(_) => (),
-                None => return Err(SolveError::InvalidInitial(self)),
+                None => return Err(SolveError::InvalidInitial),
             };
         }
         Ok(self)
@@ -53,8 +53,8 @@ impl Board {
             self.row_mut(row).iter_mut().for_each(|cell| {
                 match cell {
                     Cell::Empty => *cell = Cell::Candidates(candidate_set.clone()),
-                    Cell::Candidates(cell_cands) => {
-                        *cell = Cell::Candidates(cell_cands.intersect(&candidate_set))
+                    Cell::Candidates(cell_candidates) => {
+                        *cell = Cell::Candidates(cell_candidates.intersect(&candidate_set))
                     }
                     _ => (),
                 };
@@ -66,8 +66,8 @@ impl Board {
             self.col_mut(col).for_each(|cell| {
                 match cell {
                     Cell::Empty => *cell = Cell::Candidates(candidate_set.clone()),
-                    Cell::Candidates(cell_cands) => {
-                        *cell = Cell::Candidates(cell_cands.intersect(&candidate_set))
+                    Cell::Candidates(cell_candidates) => {
+                        *cell = Cell::Candidates(cell_candidates.intersect(&candidate_set))
                     }
                     _ => (),
                 };
@@ -80,8 +80,8 @@ impl Board {
             self.block_mut(block).for_each(|cell| {
                 match cell {
                     Cell::Empty => *cell = Cell::Candidates(candidate_set.clone()),
-                    Cell::Candidates(cell_cands) => {
-                        *cell = Cell::Candidates(cell_cands.intersect(&candidate_set))
+                    Cell::Candidates(cell_candidates) => {
+                        *cell = Cell::Candidates(cell_candidates.intersect(&candidate_set))
                     }
                     _ => (),
                 };
@@ -95,11 +95,11 @@ impl Board {
                     solved_count += 1;
                     Cell::Solved(value_set.values.into_iter().next().unwrap())
                 }
-                non_cand_cell => non_cand_cell,
+                non_candidate_cell => non_candidate_cell,
             };
         }
         if solved_count == 0 {
-            return Err(SolveError::UnderSolved(self));
+            return Err(SolveError::UnderSolved(Box::new(self)));
         }
         Ok(self)
     }
@@ -109,10 +109,10 @@ use derive_more::Display;
 pub enum SolveError {
     /// Initial input is invalid
     #[display("Invalid state of the board")]
-    InvalidInitial(Board),
-    /// Solver partially with uncertainties remainind
+    InvalidInitial,
+    /// Solver partially with uncertainties remaining
     #[display("Multiple solutions possible")]
-    UnderSolved(Board),
+    UnderSolved(Box<Board>),
 }
 
 use strum::IntoEnumIterator;
@@ -153,12 +153,12 @@ impl ValueSet {
         for cell in cells {
             let value = match cell {
                 Cell::Empty => continue,
-                Cell::Filled(value) => value.clone(),
+                Cell::Filled(value) => value,
                 Cell::Candidates(_) => continue,
-                Cell::Solved(value) => value.clone(),
+                Cell::Solved(value) => value,
             };
 
-            let inserted = present.insert(value);
+            let inserted = present.insert(*value);
             if !inserted {
                 return None;
             }
@@ -284,7 +284,7 @@ impl TryFrom<char> for Cell {
     fn try_from(value: char) -> Result<Self, Self::Error> {
         match value {
             '.' => Ok(Cell::Empty),
-            d if d.is_digit(10) => {
+            d if d.is_ascii_digit() => {
                 let digit: u8 = d.to_digit(10).unwrap().try_into()?;
                 let value: Value = digit.try_into()?;
                 Ok(Cell::Filled(value))
@@ -318,7 +318,7 @@ impl std::str::FromStr for Board {
             let row: Vec<Cell> = line
                 .chars()
                 .filter(|ch| ch != &' ')
-                .flat_map(|ch| Cell::try_from(ch))
+                .flat_map(Cell::try_from)
                 .collect();
             let row: [Cell; 9] = <[Cell; 9]>::try_from(row).map_err(|err| anyhow!("{err:?}"))?;
             rows.push(row);
@@ -355,6 +355,8 @@ impl Display for Board {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
@@ -417,7 +419,7 @@ mod tests {
                      . 6 . . . . 2 8 .\n\
                      . . . 4 1 9 . . 5\n\
                      . . . . 8 . . 7 9";
-        let board = Board::try_from(input);
+        let board = Board::from_str(input);
         assert!(board.is_ok());
     }
 
@@ -425,7 +427,7 @@ mod tests {
     fn test_board_try_from_invalid_too_few_rows() {
         let input = "5 3 . . 7 . . . .\n\
                      6 . . 1 9 5 . . .";
-        let board = Board::try_from(input);
+        let board = Board::from_str(input);
         assert!(board.is_err());
     }
 
@@ -440,7 +442,7 @@ mod tests {
                      . 6 . . .\n\
                      . . . 4 1\n\
                      . . . . 8";
-        let board = Board::try_from(input);
+        let board = Board::from_str(input);
         assert!(board.is_err());
     }
 
@@ -455,7 +457,7 @@ mod tests {
                      . 6 . . . . 2 8 .\n\
                      . . . 4 1 9 . . 5\n\
                      . . . . 8 . . 7 9";
-        let board = Board::try_from(input).unwrap();
+        let board = Board::from_str(input).unwrap();
         let output = board.to_string();
 
         // Check that output contains expected patterns
@@ -478,7 +480,7 @@ mod tests {
                      . 6 . . . . 2 8 .\n\
                      . . . 4 1 9 . . 5\n\
                      . . . . 8 . . 7 9";
-        let board = Board::try_from(input).unwrap();
+        let board = Board::from_str(input).unwrap();
 
         // Test row 1: should be [5,3,.,.,7,.,.,.,.]
         let row1 = board.row(Value::One);
@@ -509,7 +511,7 @@ mod tests {
                      . 6 . . . . 2 8 .\n\
                      . . . 4 1 9 . . 5\n\
                      . . . . 8 . . 7 9";
-        let board = Board::try_from(input).unwrap();
+        let board = Board::from_str(input).unwrap();
 
         // Test col 1: should be [5,6,.,8,4,7,.,.,.]
         let col1: Vec<_> = board.col(Value::One).collect();
@@ -541,7 +543,7 @@ mod tests {
                      . 6 . . . . 2 8 .\n\
                      . . . 4 1 9 . . 5\n\
                      . . . . 8 . . 7 9";
-        let board = Board::try_from(input).unwrap();
+        let board = Board::from_str(input).unwrap();
 
         // Test block 1 (top-left): should be [5,3,.,6,..,.,9,8]
         let block1: Vec<_> = board.block(Value::One).collect();
